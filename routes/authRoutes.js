@@ -1,128 +1,164 @@
 const express = require("express");
 const router = express.Router();
+
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+
 const User = require("../models/User");
 
+/* REGISTER */
 
-/* ===============================
-   REGISTER USER
-================================ */
 router.post("/register", async (req, res) => {
-
-  const { name, email, password } = req.body;
-
   try {
+    let { name, email, password } = req.body;
 
-    // Validation
+    name = name?.trim();
+    email = email?.trim().toLowerCase();
+    password = password?.trim();
+
     if (!name || !email || !password) {
       return res.status(400).json({
-        message: "Please provide name, email and password"
+        message:
+          "Please provide name, email and password",
       });
     }
 
-    // Check existing user
-    const existingUser = await User.findOne({ email });
+    const emailRegex =
+      /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(email)) {
+      return res.status(400).json({
+        message: "Invalid email format",
+      });
+    }
+
+    if (password.length < 6) {
+      return res.status(400).json({
+        message:
+          "Password must be at least 6 characters",
+      });
+    }
+
+    const existingUser =
+      await User.findOne({ email });
 
     if (existingUser) {
       return res.status(400).json({
-        message: "Email already registered"
+        message:
+          "Email already registered",
       });
     }
 
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
+    const hashedPassword =
+      await bcrypt.hash(password, 10);
 
-    // Create user
     const user = await User.create({
       name,
       email,
-      password: hashedPassword
+      password: hashedPassword,
     });
 
-    res.status(201).json({
-      message: "User registered successfully",
+    return res.status(201).json({
+      message:
+        "User registered successfully",
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
-      }
+        role: user.role,
+      },
     });
-
   } catch (error) {
+    console.error(error);
 
-    res.status(500).json({
-      message: error.message
+    return res.status(500).json({
+      message:
+        "Registration failed",
     });
-
   }
-
 });
 
+/* LOGIN */
 
-/* ===============================
-   LOGIN USER
-================================ */
 router.post("/login", async (req, res) => {
-
-  const { email, password } = req.body;
-
   try {
+    let { email, password } = req.body;
 
-    // Find user
-    const user = await User.findOne({ email });
+    email = email?.trim().toLowerCase();
+    password = password?.trim();
+
+    if (!email || !password) {
+      return res.status(400).json({
+        message:
+          "Email and password required",
+      });
+    }
+
+    const user =
+      await User.findOne({ email });
 
     if (!user) {
       return res.status(400).json({
-        message: "Invalid credentials"
+        message:
+          "Invalid credentials",
       });
     }
 
-    // 🚨 Check if user is blocked
     if (user.isBlocked) {
       return res.status(403).json({
-        message: "Your account has been blocked by admin"
+        message:
+          "Your account has been blocked by admin",
       });
     }
 
-    // Compare password
-    const isMatch = await bcrypt.compare(password, user.password);
+    const isMatch =
+      await bcrypt.compare(
+        password,
+        user.password
+      );
 
     if (!isMatch) {
       return res.status(400).json({
-        message: "Invalid credentials"
+        message:
+          "Invalid credentials",
       });
     }
 
-    // Generate JWT token
+    if (!process.env.JWT_SECRET) {
+      return res.status(500).json({
+        message:
+          "JWT secret not configured",
+      });
+    }
+
     const token = jwt.sign(
-      { id: user._id, role: user.role },
+      {
+        id: user._id,
+        role: user.role,
+      },
       process.env.JWT_SECRET,
-      { expiresIn: "30d" }
+      {
+        expiresIn: "30d",
+      }
     );
 
-    // Send response
-    res.json({
+    return res.json({
       message: "Login successful",
       token,
       user: {
         _id: user._id,
         name: user.name,
         email: user.email,
-        role: user.role
-      }
+        role: user.role,
+      },
     });
-
   } catch (error) {
+    console.error(error);
 
-    res.status(500).json({
-      message: error.message
+    return res.status(500).json({
+      message: "Login failed",
     });
-
   }
-
 });
-
 
 module.exports = router;

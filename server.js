@@ -15,11 +15,16 @@ const app = express();
 
 connectDB();
 
-app.use(cors({
-  origin: "https://sneakpeak-frontend.vercel.app",
-  methods: ["GET", "POST", "PUT", "DELETE"],
-  credentials: true
-}));
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://sneakpeak-frontend.vercel.app"
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE"],
+    credentials: true
+  })
+);
 
 app.use(express.json());
 
